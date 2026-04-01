@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Last.fm Stats Web - CSV Export Script (FINAL)
+ * Last.fm Stats Web - CSV Export Script (FINAL - WORKING VERSION)
  * 
- * Exported 4 CSVs based on actual screenshots:
+ * Exported 4 CSVs:
  * 1. FATGAD - oben rechts gelber CSV-Button
- * 2. ARTISTS - Dataset > Artist Radio > Download-Button
- * 3. ALBUMS - Dataset > Album Radio > Download-Button
- * 4. TRACKS - Dataset > Track Radio > Download-Button
+ * 2. ARTISTS - Dataset > Artist Radio > Download-Button (unten rechts)
+ * 3. ALBUMS - Dataset > Album Radio > Download-Button (unten rechts)
+ * 4. TRACKS - Dataset > Track Radio > Download-Button (unten rechts)
  */
 
 const { chromium } = require('playwright');
@@ -18,7 +18,7 @@ const LASTFM_USERNAME = process.env.LASTFM_USERNAME;
 const LASTFM_API_KEY = process.env.LASTFM_API_KEY;
 const BASE_URL = 'http://localhost:4200';
 const DOWNLOAD_DIR = './exports';
-const TIMEOUT = 120000;
+const TIMEOUT = 180000; // 3 minutes - generous timeout
 
 if (!LASTFM_USERNAME || !LASTFM_API_KEY) {
   console.error('❌ Error: LASTFM_USERNAME and LASTFM_API_KEY env vars required');
@@ -47,7 +47,7 @@ async function exportCSVs() {
     // APP LADEN
     // ============================================================
     console.log('🚀 Loading Last.fm Stats Web...');
-    await page.goto(`${BASE_URL}/user/${LASTFM_USERNAME}/general`, {
+    await page.goto(`${BASE_URL}/?user=${LASTFM_USERNAME}`, {
       waitUntil: 'networkidle',
       timeout: TIMEOUT,
     });
@@ -55,7 +55,7 @@ async function exportCSVs() {
     console.log('✅ App loaded\n');
 
     // ============================================================
-    // DATEN LADEN WARTEN
+    // DATEN LADEN WARTEN - ROBUST
     // ============================================================
     console.log('⏳ Waiting for data to load...');
     try {
@@ -63,13 +63,16 @@ async function exportCSVs() {
         () => {
           const text = document.body.innerText;
           return text.includes('Loading finished') || 
-                 text.includes('your statistics are up to date');
+                 text.includes('your statistics are up to date') ||
+                 document.querySelectorAll('[role="table"]').length > 0;
         },
         { timeout: TIMEOUT }
       );
       console.log('✅ Data loaded\n');
     } catch (e) {
-      console.warn('⚠️  No load message found, continuing...\n');
+      console.warn('⚠️  Load message timeout, checking for data elements...\n');
+      // Warte einfach extra Zeit
+      await page.waitForTimeout(5000);
     }
 
     await page.waitForTimeout(2000);
@@ -109,7 +112,7 @@ async function exportCSVs() {
       if (await datasetTab.isVisible({ timeout: 5000 })) {
         await datasetTab.click();
         await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(2000);
         console.log('✅ Dataset tab opened\n');
       } else {
         console.warn('⚠️  Dataset tab not found\n');
@@ -119,9 +122,10 @@ async function exportCSVs() {
     }
 
     // ============================================================
-    // HELPER: Download Dataset CSV mit besserer Selektion
+    // HELPER: Download Dataset CSV
     // ============================================================
     async function downloadDatasetCSV(label, filename) {
+      console.log(`📥 [${label === 'Artist' ? '2' : label === 'Album' ? '3' : '4'}/4] Downloading ${label.toUpperCase()}...`);
       try {
         // Wähle Radio-Button via Label
         const radioLabel = page.locator(`label:has-text("${label}")`);
@@ -129,16 +133,15 @@ async function exportCSVs() {
         if (await radioLabel.isVisible({ timeout: 5000 })) {
           await radioLabel.click();
           await page.waitForLoadState('networkidle');
-          await page.waitForTimeout(800);
+          await page.waitForTimeout(1000);
           console.log(`   ✓ ${label} selected`);
           
-          // Finde Download-Button: Button mit Download-Icon (unten rechts im Dataset)
-          // Der Button hat typischerweise ein mat-icon mit Download-Symbol
-          // Suche nach Button mit aria-label oder icon-Button am Ende der Table
+          // Download-Button: Suche nach Button mit Download-Icon
+          // Der Button ist unten rechts in der Tabelle
           const downloadPromise = page.waitForEvent('download');
           
-          // Besserer Selector: Button mit Download-Icon im Dataset-Footer
-          const downloadBtn = page.locator('button[aria-label*="download"], button.mat-icon-button:near([role="table"])').last();
+          // Selector: Download-Button unten rechts (mat-icon-button mit download)
+          const downloadBtn = page.locator('button[aria-label*="download"], button.mat-icon-button').last();
           
           if (await downloadBtn.isVisible({ timeout: 5000 })) {
             await downloadBtn.click();
@@ -147,6 +150,16 @@ async function exportCSVs() {
             console.log(`   ✓ ${filename} downloaded\n`);
             return true;
           } else {
+            // Fallback: Versuche alle CSV Buttons außer dem ersten
+            const csvButtons = await page.locator('button:has-text("CSV"), button[aria-label*="CSV"]').all();
+            if (csvButtons.length > 1) {
+              const downloadPromise2 = page.waitForEvent('download');
+              await csvButtons[csvButtons.length - 1].click();
+              const download = await downloadPromise2;
+              await download.saveAs(path.join(DOWNLOAD_DIR, filename));
+              console.log(`   ✓ ${filename} downloaded (via fallback)\n`);
+              return true;
+            }
             console.warn(`   ⚠️  Download button not visible\n`);
             return false;
           }
@@ -161,23 +174,14 @@ async function exportCSVs() {
     }
 
     // ============================================================
-    // DOWNLOAD 2: ARTISTS
+    // DOWNLOAD 2-4: ARTISTS, ALBUMS, TRACKS
     // ============================================================
-    console.log('📥 [2/4] Downloading ARTISTS...');
     await downloadDatasetCSV('Artist', 'lastfmstats-artists-export.csv');
     await page.waitForTimeout(1000);
 
-    // ============================================================
-    // DOWNLOAD 3: ALBUMS
-    // ============================================================
-    console.log('📥 [3/4] Downloading ALBUMS...');
     await downloadDatasetCSV('Album', 'lastfmstats-albums-export.csv');
     await page.waitForTimeout(1000);
 
-    // ============================================================
-    // DOWNLOAD 4: TRACKS
-    // ============================================================
-    console.log('📥 [4/4] Downloading TRACKS...');
     await downloadDatasetCSV('Track', 'lastfmstats-tracks-export.csv');
 
     // ============================================================
