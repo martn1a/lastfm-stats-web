@@ -32,14 +32,14 @@ jobs:
           node scripts/export-csv.js
       - name: 📤 Push CSVs to SpotifyRandom Repo
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          LASTFM_PUSH_TOKEN: ${{ secrets.LASTFM_PUSH_TOKEN }}
           TARGET_REPO: martn1a/SpotifyRandom
         run: |
           git config --global user.name "Last.fm CSV Export Bot"
           git config --global user.email "bot@github.com"
           mkdir -p /tmp/target-repo
           cd /tmp/target-repo
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git .
+          git clone https://x-access-token:${LASTFM_PUSH_TOKEN}@github.com/${TARGET_REPO}.git .
           cp $GITHUB_WORKSPACE/exports/*.csv lastfm-parser/
           git add lastfm-parser/*.csv
           git commit -m "📊 Auto-generated Last.fm CSVs $(date +%Y-%m-%d\ %H:%M:%S)" || echo "No changes"
