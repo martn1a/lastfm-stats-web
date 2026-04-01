@@ -119,110 +119,66 @@ async function exportCSVs() {
     }
 
     // ============================================================
+    // HELPER: Download Dataset CSV mit besserer Selektion
+    // ============================================================
+    async function downloadDatasetCSV(label, filename) {
+      try {
+        // Wähle Radio-Button via Label
+        const radioLabel = page.locator(`label:has-text("${label}")`);
+        
+        if (await radioLabel.isVisible({ timeout: 5000 })) {
+          await radioLabel.click();
+          await page.waitForLoadState('networkidle');
+          await page.waitForTimeout(800);
+          console.log(`   ✓ ${label} selected`);
+          
+          // Finde Download-Button: Button mit Download-Icon (unten rechts im Dataset)
+          // Der Button hat typischerweise ein mat-icon mit Download-Symbol
+          // Suche nach Button mit aria-label oder icon-Button am Ende der Table
+          const downloadPromise = page.waitForEvent('download');
+          
+          // Besserer Selector: Button mit Download-Icon im Dataset-Footer
+          const downloadBtn = page.locator('button[aria-label*="download"], button.mat-icon-button:near([role="table"])').last();
+          
+          if (await downloadBtn.isVisible({ timeout: 5000 })) {
+            await downloadBtn.click();
+            const download = await downloadPromise;
+            await download.saveAs(path.join(DOWNLOAD_DIR, filename));
+            console.log(`   ✓ ${filename} downloaded\n`);
+            return true;
+          } else {
+            console.warn(`   ⚠️  Download button not visible\n`);
+            return false;
+          }
+        } else {
+          console.warn(`   ⚠️  ${label} label not found\n`);
+          return false;
+        }
+      } catch (e) {
+        console.warn(`   ⚠️  ${label} download failed: ${e.message}\n`);
+        return false;
+      }
+    }
+
+    // ============================================================
     // DOWNLOAD 2: ARTISTS
     // ============================================================
     console.log('📥 [2/4] Downloading ARTISTS...');
-    try {
-      // Wähle "Artist" Radio-Button
-      // Screenshot zeigt: Radio mit Label "Artist"
-      const artistLabel = page.locator('label:has-text("Artist")').first();
-      
-      if (await artistLabel.isVisible({ timeout: 5000 })) {
-        await artistLabel.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(800);
-        console.log('   ✓ Artist selected');
-        
-        // Klick Download-Button (gelb, unten rechts)
-        const downloadPromise = page.waitForEvent('download');
-        const downloadBtn = page.locator('button:has-text("CSV")').last();
-        
-        if (await downloadBtn.isVisible({ timeout: 5000 })) {
-          await downloadBtn.click();
-          const download = await downloadPromise;
-          await download.saveAs(path.join(DOWNLOAD_DIR, 'lastfmstats-artists-export.csv'));
-          console.log('   ✓ lastfmstats-artists-export.csv downloaded\n');
-        } else {
-          console.warn('   ⚠️  Download button not visible\n');
-        }
-      } else {
-        console.warn('   ⚠️  Artist label not found\n');
-      }
-    } catch (e) {
-      console.warn(`   ⚠️  Artists download failed: ${e.message}\n`);
-    }
-
+    await downloadDatasetCSV('Artist', 'lastfmstats-artists-export.csv');
     await page.waitForTimeout(1000);
 
     // ============================================================
     // DOWNLOAD 3: ALBUMS
     // ============================================================
     console.log('📥 [3/4] Downloading ALBUMS...');
-    try {
-      // Wähle "Album" Radio-Button
-      // Screenshot zeigt: Radio mit Label "Album"
-      const albumLabel = page.locator('label:has-text("Album")').first();
-      
-      if (await albumLabel.isVisible({ timeout: 5000 })) {
-        await albumLabel.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(800);
-        console.log('   ✓ Album selected');
-        
-        // Klick Download-Button (gelb, unten rechts)
-        const downloadPromise = page.waitForEvent('download');
-        const downloadBtn = page.locator('button:has-text("CSV")').last();
-        
-        if (await downloadBtn.isVisible({ timeout: 5000 })) {
-          await downloadBtn.click();
-          const download = await downloadPromise;
-          await download.saveAs(path.join(DOWNLOAD_DIR, 'lastfmstats-albums-export.csv'));
-          console.log('   ✓ lastfmstats-albums-export.csv downloaded\n');
-        } else {
-          console.warn('   ⚠️  Download button not visible\n');
-        }
-      } else {
-        console.warn('   ⚠️  Album label not found\n');
-      }
-    } catch (e) {
-      console.warn(`   ⚠️  Albums download failed: ${e.message}\n`);
-    }
-
+    await downloadDatasetCSV('Album', 'lastfmstats-albums-export.csv');
     await page.waitForTimeout(1000);
 
     // ============================================================
     // DOWNLOAD 4: TRACKS
     // ============================================================
     console.log('📥 [4/4] Downloading TRACKS...');
-    try {
-      // Wähle "Track" Radio-Button
-      // Screenshot zeigt: Radio mit Label "Track"
-      const trackLabel = page.locator('label:has-text("Track")').first();
-      
-      if (await trackLabel.isVisible({ timeout: 5000 })) {
-        await trackLabel.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(800);
-        console.log('   ✓ Track selected');
-        
-        // Klick Download-Button (gelb, unten rechts)
-        const downloadPromise = page.waitForEvent('download');
-        const downloadBtn = page.locator('button:has-text("CSV")').last();
-        
-        if (await downloadBtn.isVisible({ timeout: 5000 })) {
-          await downloadBtn.click();
-          const download = await downloadPromise;
-          await download.saveAs(path.join(DOWNLOAD_DIR, 'lastfmstats-tracks-export.csv'));
-          console.log('   ✓ lastfmstats-tracks-export.csv downloaded\n');
-        } else {
-          console.warn('   ⚠️  Download button not visible\n');
-        }
-      } else {
-        console.warn('   ⚠️  Track label not found\n');
-      }
-    } catch (e) {
-      console.warn(`   ⚠️  Tracks download failed: ${e.message}\n`);
-    }
+    await downloadDatasetCSV('Track', 'lastfmstats-tracks-export.csv');
 
     // ============================================================
     // FERTIG
