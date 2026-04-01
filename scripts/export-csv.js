@@ -47,7 +47,7 @@ async function exportCSVs() {
     // APP LADEN
     // ============================================================
     console.log('🚀 Loading Last.fm Stats Web...');
-    await page.goto(`${BASE_URL}/?user=${LASTFM_USERNAME}`, {
+    await page.goto(`${BASE_URL}/user/${LASTFM_USERNAME}/general`, {
       waitUntil: 'networkidle',
       timeout: TIMEOUT,
     });
