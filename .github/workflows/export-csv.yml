@@ -1,43 +1,28 @@
 name: Export Last.fm CSVs
-
 on:
   schedule:
-    # Montag 2:00 UTC
-    - cron: '0 2 * * 1'
-    # Donnerstag 2:00 UTC
-    - cron: '0 2 * * 4'
+    - cron: '0 2 * * 1'   # Montag 2:00 UTC
+    - cron: '0 2 * * 4'   # Donnerstag 2:00 UTC
   workflow_dispatch:
-
 jobs:
   export:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v4
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
       - name: 📦 Install Dependencies
         run: npm install --legacy-peer-deps
-      
       - name: 🎭 Install Playwright
         run: npx playwright install --with-deps chromium
-      
       - name: 🏗️ Build Angular App
         run: npm run build lastfm-stats
-      
       - name: 🚀 Start Dev Server (Background)
         run: |
           npm run ng serve lastfm-stats -- --port 4200 &
-          # Warte, bis Server läuft
           timeout 60 bash -c 'until curl -s http://localhost:4200 > /dev/null; do sleep 1; done'
-        env:
-          NODE_ENV: production
-      
       - name: 🎵 Export CSVs
         env:
           LASTFM_USERNAME: ${{ secrets.LASTFM_USERNAME }}
@@ -45,31 +30,17 @@ jobs:
         run: |
           mkdir -p exports
           node scripts/export-csv.js
-      
       - name: 📤 Push CSVs to SpotifyRandom Repo
         env:
           GITHUB_TOKEN: ${{ github.token }}
           TARGET_REPO: martn1a/SpotifyRandom
         run: |
-          # Configure git
           git config --global user.name "Last.fm CSV Export Bot"
           git config --global user.email "bot@github.com"
-          
-          # Clone target repo
           mkdir -p /tmp/target-repo
           cd /tmp/target-repo
           git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${TARGET_REPO}.git .
-          
-          # Copy CSVs
-          cp ../exports/*.csv lastfm-parser/
-          
-          # Commit & Push
+          cp $GITHUB_WORKSPACE/exports/*.csv lastfm-parser/
           git add lastfm-parser/*.csv
           git commit -m "📊 Auto-generated Last.fm CSVs $(date +%Y-%m-%d\ %H:%M:%S)" || echo "No changes"
           git push
-
-      - name: 📊 Summary
-        run: |
-          echo "✅ CSV Export completed!"
-          echo "📁 Files exported:"
-          ls -lh exports/
