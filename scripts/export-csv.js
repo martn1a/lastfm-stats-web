@@ -48,16 +48,16 @@ async function exportCSVs() {
     // ============================================================
     console.log('🚀 Loading Last.fm Stats Web...');
     await page.goto(`${BASE_URL}/user/${LASTFM_USERNAME}/general`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',  // FIX: nicht auf networkidle warten (App lädt ~4min Daten)
       timeout: TIMEOUT,
     });
-    await page.waitForLoadState('networkidle');
     console.log('✅ App loaded\n');
 
     // ============================================================
     // DATEN LADEN WARTEN
+    // FIX: Timeout auf 10 Minuten erhöht — App lädt 77 Seiten à ~4min von Last.fm API
     // ============================================================
-    console.log('⏳ Waiting for data to load...');
+    console.log('⏳ Waiting for data to load (up to 10 minutes)...');
     try {
       await page.waitForFunction(
         () => {
@@ -65,7 +65,7 @@ async function exportCSVs() {
           return text.includes('Loading finished') || 
                  text.includes('your statistics are up to date');
         },
-        { timeout: TIMEOUT }
+        { timeout: 600000 }  // 10 Minuten
       );
       console.log('✅ Data loaded\n');
     } catch (e) {
@@ -108,8 +108,7 @@ async function exportCSVs() {
       
       if (await datasetTab.isVisible({ timeout: 5000 })) {
         await datasetTab.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(1500);  // FIX: kein waitForLoadState('networkidle')
         console.log('✅ Dataset tab opened\n');
       } else {
         console.warn('⚠️  Dataset tab not found\n');
@@ -129,8 +128,7 @@ async function exportCSVs() {
       
       if (await artistLabel.isVisible({ timeout: 5000 })) {
         await artistLabel.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(800);  // FIX: kein waitForLoadState('networkidle')
         console.log('   ✓ Artist selected');
         
         const downloadPromise = page.waitForEvent('download');
@@ -165,8 +163,7 @@ async function exportCSVs() {
       
       if (await albumLabel.isVisible({ timeout: 5000 })) {
         await albumLabel.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(800);  // FIX: kein waitForLoadState('networkidle')
         console.log('   ✓ Album selected');
         
         const downloadPromise = page.waitForEvent('download');
@@ -201,8 +198,7 @@ async function exportCSVs() {
       
       if (await trackLabel.isVisible({ timeout: 5000 })) {
         await trackLabel.click();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(800);  // FIX: kein waitForLoadState('networkidle')
         console.log('   ✓ Track selected');
         
         const downloadPromise = page.waitForEvent('download');
